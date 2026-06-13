@@ -374,13 +374,13 @@
     return '<div class="match" data-k="'+(h+' '+a+' '+H[1]+' '+A[1]+' group '+g).toLowerCase()+'">'+
       '<span>'+H[0]+' '+h+'</span>'+chip(rec,time)+'<span>'+a+' '+A[0]+'</span>'+
       '<span class="meta">'+(showDay?day+' '+time+' · ':'')+'Group '+g+' · '+v+'</span>'+
-      '<span class="who">'+H[1]+' v '+A[1]+'</span></div>';
+      '<span class="who">'+H[0]+' '+H[1]+' v '+A[1]+' '+A[0]+'</span></div>';
   }
   function koHTML(rec){
     const H=E[rec.hk],A=E[rec.ak];
     return '<div class="match"><span>'+H[0]+' '+rec.hk+'</span>'+chip(rec,'')+'<span>'+rec.ak+' '+A[0]+'</span>'+
       '<span class="meta">'+aest(rec.date)+' AEST · Knockout</span>'+
-      '<span class="who">'+H[1]+' v '+A[1]+'</span></div>';
+      '<span class="who">'+H[0]+' '+H[1]+' v '+A[1]+' '+A[0]+'</span></div>';
   }
 
   function renderSchedule(){
@@ -394,7 +394,7 @@
     if(upcomingKO.length){
       html+='<div class="day-h">Knockout stage</div>';
       upcomingKO.sort((a,b)=>a.date<b.date?-1:1).forEach(r=>{
-        html+='<div class="match"><span>'+E[r.hk][0]+' '+r.hk+'</span><span class="vs">'+aest(r.date)+'</span><span>'+r.ak+' '+E[r.ak][0]+'</span><span class="who">'+E[r.hk][1]+' v '+E[r.ak][1]+'</span></div>';
+        html+='<div class="match"><span>'+E[r.hk][0]+' '+r.hk+'</span><span class="vs">'+aest(r.date)+'</span><span>'+r.ak+' '+E[r.ak][0]+'</span><span class="who">'+E[r.hk][0]+' '+E[r.hk][1]+' v '+E[r.ak][1]+' '+E[r.ak][0]+'</span></div>';
       });
     }
     sEl.innerHTML=html;
@@ -415,11 +415,11 @@
     const inFixture=fixtureByPair[pairKey(r.hk,r.ak)]!=null;
     let who='';
     if(r.state==='post'){
-      if(r.hs>r.as) who='🟡 '+H[1]+' ('+r.hk+') takes the points over '+A[1]+'.';
-      else if(r.as>r.hs) who='🟡 '+A[1]+' ('+r.ak+') takes the points over '+H[1]+'.';
-      else who='🤝 Honours even — a point each for '+H[1]+' and '+A[1]+'.';
+      if(r.hs>r.as) who='🟡 '+H[0]+' '+H[1]+' ('+r.hk+') takes the points over '+A[0]+' '+A[1]+'.';
+      else if(r.as>r.hs) who='🟡 '+A[0]+' '+A[1]+' ('+r.ak+') takes the points over '+H[0]+' '+H[1]+'.';
+      else who='🤝 Honours even — a point each for '+H[0]+' '+H[1]+' and '+A[0]+' '+A[1]+'.';
       if(r.pso) who+=' ('+r.pso+')';
-    } else who=H[1]+' v '+A[1];
+    } else who=H[0]+' '+H[1]+' v '+A[1]+' '+A[0];
     return '<div class="match"><span>'+H[0]+' '+r.hk+'</span>'+chip(r,'')+'<span>'+r.ak+' '+A[0]+'</span>'+
       '<span class="meta">'+aest(r.date)+' AEST'+(inFixture?' · Group '+H[2]:' · Knockout')+(r.detail&&r.state==='in'?' · '+r.detail:'')+'</span>'+
       '<span class="who">'+who+'</span></div>';
@@ -442,7 +442,7 @@
       const rows=Object.values(groups[g]).sort((x,y)=> y.Pts-x.Pts || (y.GF-y.GA)-(x.GF-x.GA) || y.GF-x.GF || x.c.localeCompare(y.c));
       return '<div class="grp"><h3>Group <span>'+g+'</span></h3><table>'+
         '<tr><th class="num">#</th><th>Team</th><th class="num">P</th><th class="num">W</th><th class="num">D</th><th class="num">L</th><th class="num">GD</th><th class="num">Pts</th></tr>'+
-        rows.map((t,i)=>'<tr><td class="num">'+(i+1)+'</td><td>'+t.fl+' '+t.c+'<br><span class="emp" style="font-size:10px;">'+t.emp+'</span></td><td class="num">'+t.P+'</td><td class="num">'+t.W+'</td><td class="num">'+t.D+'</td><td class="num">'+t.L+'</td><td class="num">'+((t.GF-t.GA)>0?'+':'')+(t.GF-t.GA)+'</td><td class="num"><b>'+t.Pts+'</b></td></tr>').join('')+
+        rows.map((t,i)=>'<tr><td class="num">'+(i+1)+'</td><td>'+t.fl+' '+t.c+'<br><span class="emp" style="font-size:10px;">'+t.fl+' '+t.emp+'</span></td><td class="num">'+t.P+'</td><td class="num">'+t.W+'</td><td class="num">'+t.D+'</td><td class="num">'+t.L+'</td><td class="num">'+((t.GF-t.GA)>0?'+':'')+(t.GF-t.GA)+'</td><td class="num"><b>'+t.Pts+'</b></td></tr>').join('')+
         '</table></div>';
     }).join('');
   }
@@ -474,7 +474,7 @@
   Object.keys(groupsDraw).sort().forEach(g=>{
     const card=document.createElement('div');card.className='grp';
     card.innerHTML='<h3>Group <span>'+g+'</span></h3>'+groupsDraw[g].map(t=>
-      '<div class="row" data-k="'+(t.c+' '+t.emp).toLowerCase()+'"><span>'+t.fl+' '+t.c+'</span><span class="emp">'+t.emp+'</span></div>').join('');
+      '<div class="row" data-k="'+(t.c+' '+t.emp).toLowerCase()+'"><span>'+t.fl+' '+t.c+'</span><span class="emp">'+t.fl+' '+t.emp+'</span></div>').join('');
     gEl.appendChild(card);
   });
   document.getElementById('sweep-search').addEventListener('input',e=>{
