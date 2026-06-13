@@ -117,6 +117,8 @@
   .note{font-size:12px;opacity:.6;margin-top:12px;}
   .empty{font-size:13px;opacity:.55;padding:10px 2px;}
   @media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important;} }
+  /* Render emoji (incl. flags) as images so they show on Windows too */
+  img.emoji{height:1em;width:1em;margin:0 .06em 0 .08em;vertical-align:-0.12em;display:inline-block;}
 </style>
 </head>
 <body>
@@ -194,6 +196,7 @@
 
 </div>
 
+<script src="https://cdn.jsdelivr.net/npm/twemoji@14.0.2/dist/twemoji.min.js" crossorigin="anonymous"></script>
 <script>
 (function(){
   // ---------- Sweep data ----------
@@ -465,7 +468,8 @@
     document.getElementById('next-matches').innerHTML=liveFix.concat(upFix).map(m=>matchHTML(m,true)).join('')||'<p class="empty">Group stage complete — see the knockout bracket in Schedule.</p>';
   }
 
-  function renderAll(){renderDash();renderStandings();renderSchedule();renderResults();}
+  function paintEmoji(){ if(window.twemoji){ try{ twemoji.parse(document.body,{base:'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/',folder:'svg',ext:'.svg'}); }catch(e){} } }
+  function renderAll(){renderDash();renderStandings();renderSchedule();renderResults();paintEmoji();}
 
   // ---------- Sweep draw tab ----------
   const groupsDraw={};
