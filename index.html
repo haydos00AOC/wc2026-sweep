@@ -119,6 +119,23 @@
   @media (prefers-reduced-motion: reduce){ *{transition:none!important;animation:none!important;} }
   /* Render emoji (incl. flags) as images so they show on Windows too */
   img.emoji{height:1em;width:1em;margin:0 .06em 0 .08em;vertical-align:-0.12em;display:inline-block;}
+
+  /* Knockout bracket */
+  #bracket{display:flex;gap:14px;overflow-x:auto;padding:4px 2px 12px;}
+  .bk-col{flex:0 0 248px;}
+  .bk-col-h{background:var(--green);color:var(--gold);font-weight:800;font-size:11.5px;letter-spacing:.6px;text-transform:uppercase;padding:9px 12px;border-radius:10px;margin-bottom:12px;text-align:center;}
+  .bk-col-final .bk-col-h{background:var(--gold);color:var(--black);}
+  .bk-match{background:var(--white);border:1.5px solid #00505833;border-radius:12px;padding:7px 10px;margin-bottom:12px;}
+  .bk-side{display:flex;align-items:center;gap:6px;padding:5px 2px;font-size:13px;}
+  .bk-side + .bk-side{border-top:1px solid #00505814;}
+  .bk-name{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+  .bk-ph{color:#00505888;font-style:italic;}
+  .bk-side .emp{font-size:10.5px;padding:2px 7px;}
+  .bk-sc{font-weight:800;color:var(--green);min-width:20px;text-align:center;}
+  .bk-win{font-weight:800;}
+  .bk-win .bk-sc{color:var(--black);background:var(--gold);border-radius:6px;}
+  .bk-meta{font-size:10.5px;opacity:.6;margin-top:6px;text-align:center;}
+  .bk-tbd{font-size:12px;opacity:.5;font-style:italic;padding:10px 4px;}
 </style>
 </head>
 <body>
@@ -139,6 +156,7 @@
     <button class="tab" data-p="stand">📊 Standings</button>
     <button class="tab" data-p="sweep">👥 Sweep Draw</button>
     <button class="tab" data-p="sched">📅 Schedule</button>
+    <button class="tab" data-p="bracket">🗺️ Bracket</button>
     <button class="tab" data-p="res">⚽ Results</button>
   </div>
 
@@ -157,9 +175,9 @@
     <div class="section-title">Tournament roadmap</div>
     <div class="ko">
       <div><b>Group stage</b><span>11 – 27 Jun</span></div>
-      <div><b>Round of 32</b><span>28 Jun – 3 Jul</span></div>
+      <div><b>Round of 32</b><span>28 Jun – 4 Jul</span></div>
       <div><b>Round of 16</b><span>4 – 7 Jul</span></div>
-      <div><b>Quarter-finals</b><span>9 – 11 Jul</span></div>
+      <div><b>Quarter-finals</b><span>9 – 12 Jul</span></div>
       <div><b>Semi-finals</b><span>14 – 15 Jul</span></div>
       <div><b>Bronze match</b><span>18 Jul · Miami</span></div>
       <div class="final"><b>🏆 The Final</b><span>19 Jul · New York NJ</span></div>
@@ -184,6 +202,13 @@
     <input class="search" id="sched-search" placeholder="🔍 Filter fixtures by team, staff member or group…" />
     <div id="schedule"></div>
     <p class="note">All 72 group-stage fixtures in AEST (Sydney). Knockout matches appear automatically once pairings are confirmed.</p>
+  </div>
+
+  <!-- BRACKET -->
+  <div class="panel" id="p-bracket">
+    <div class="section-title">Knockout bracket — the road to the Final</div>
+    <div id="bracket"><p class="empty">The knockout bracket appears here once qualifiers are confirmed. Hit “Refresh scores”.</p></div>
+    <p class="note">Teams, scores and winners update live. A slot like “R32 #3 W” means the winner of Round-of-32 match 3 (filled in as soon as that game finishes). All times AEST · scroll sideways for later rounds.</p>
   </div>
 
   <!-- RESULTS -->
@@ -319,7 +344,9 @@
     // seed so the page is never empty if the feed is unreachable
     [pairKey("Mexico","South Africa")]: {hk:"Mexico",ak:"South Africa",hs:2,as:0,state:"post",detail:"FT",date:"2026-06-11T19:00Z"}
   };
-  let knockout = []; // matches not in the group fixture list
+  let knockout = []; // resolved knockout matches (both teams known) — used by Schedule/Results
+  let bracketGames = []; // ALL knockout matches incl. unresolved slots — used by the Bracket tab
+  const SLUG_ROUND = {'round-of-32':'R32','round-of-16':'R16','quarterfinals':'QF','semifinals':'SF','3rd-place-match':'3RD','third-place':'3RD','final':'F'};
 
   const aest = iso => new Date(iso).toLocaleString('en-AU',{timeZone:'Australia/Sydney',weekday:'short',day:'numeric',month:'short',hour:'numeric',minute:'2-digit',hour12:true}).replace(',','');
 
@@ -330,23 +357,32 @@
       const r=await fetch('https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?limit=400&dates=20260611-20260720');
       if(!r.ok) throw new Error('HTTP '+r.status);
       const d=await r.json();
-      knockout=[];
-      (d.events||[]).forEach(ev=>{
+      knockout=[]; bracketGames=[];
+      (d.events||[]).forEach((ev,idx)=>{
         try{
           const c=ev.competitions&&ev.competitions[0]; if(!c) return;
           const hC=c.competitors.find(x=>x.homeAway==='home');
           const aC=c.competitors.find(x=>x.homeAway==='away');
           if(!hC||!aC) return;
-          const hk=teamKey(hC.team.displayName)||teamKey(hC.team.shortDisplayName||'');
-          const ak=teamKey(aC.team.displayName)||teamKey(aC.team.shortDisplayName||'');
-          if(!hk||!ak) return; // TBD knockout slots etc.
+          const hName=hC.team.displayName, aName=aC.team.displayName;
+          const hk=teamKey(hName)||teamKey(hC.team.shortDisplayName||'');
+          const ak=teamKey(aName)||teamKey(aC.team.shortDisplayName||'');
           const state=ev.status&&ev.status.type?ev.status.type.state:'pre'; // pre | in | post
-          const rec={hk,ak,hs:parseInt(hC.score||0),as:parseInt(aC.score||0),state,
-                     detail:(ev.status&&ev.status.type&&ev.status.type.shortDetail)||'',date:ev.date};
-          if(hC.shootoutScore!=null&&aC.shootoutScore!=null){rec.pso=hC.shootoutScore+'–'+aC.shootoutScore+' pens';}
-          const k=pairKey(hk,ak);
-          if(fixtureByPair[k]!=null){ if(state!=='pre') scoreByPair[k]=rec; }
-          else knockout.push(rec);
+          const hs=parseInt(hC.score||0), as=parseInt(aC.score||0);
+          const detail=(ev.status&&ev.status.type&&ev.status.type.shortDetail)||'';
+          const slug=(ev.season&&ev.season.slug)||'';
+          let pso=null;
+          if(hC.shootoutScore!=null&&aC.shootoutScore!=null){pso=hC.shootoutScore+'–'+aC.shootoutScore+' pens';}
+          const inFixture = hk&&ak&&fixtureByPair[pairKey(hk,ak)]!=null;
+          if(slug==='group-stage' || inFixture){
+            if(!hk||!ak) return; // group game we can't map — skip
+            const rec={hk,ak,hs,as,state,detail,date:ev.date}; if(pso) rec.pso=pso;
+            if(state!=='pre') scoreByPair[pairKey(hk,ak)]=rec;
+          } else {
+            // knockout match — keep it even if one/both slots are still TBD
+            bracketGames.push({round:SLUG_ROUND[slug]||'R32',slug,hName,aName,hk,ak,hs,as,state,detail,date:ev.date,pso,idx});
+            if(hk&&ak){ const rec={hk,ak,hs,as,state,detail,date:ev.date}; if(pso) rec.pso=pso; knockout.push(rec); }
+          }
         }catch(e){}
       });
       renderAll();
@@ -462,14 +498,60 @@
       document.getElementById('st-latest').textContent=name;
       document.getElementById('st-latest-lbl').textContent='Latest result — '+lbl;
     }
-    // live first, then next unplayed fixtures
+    // group stage: live first, then next unplayed fixtures
     const liveFix=M.filter(m=>{const r=scoreByPair[pairKey(m[2],m[3])];return r&&r.state==='in';});
     const upFix=M.filter(m=>!scoreByPair[pairKey(m[2],m[3])]).slice(0,6-liveFix.length);
-    document.getElementById('next-matches').innerHTML=liveFix.concat(upFix).map(m=>matchHTML(m,true)).join('')||'<p class="empty">Group stage complete — see the knockout bracket in Schedule.</p>';
+    let html=liveFix.concat(upFix).map(m=>matchHTML(m,true)).join('');
+    if(!html){
+      // group stage done — show live + soonest upcoming knockout matches instead
+      const ko=bracketGames.filter(g=>g.state!=='post').sort((a,b)=>a.date<b.date?-1:(a.date>b.date?1:a.idx-b.idx)).slice(0,6);
+      html=ko.map(koLineHTML).join('')||'<p class="empty">No upcoming matches — the tournament is complete.</p>';
+    }
+    document.getElementById('next-matches').innerHTML=html;
+  }
+
+  const ROUND_NAME={R32:'Round of 32',R16:'Round of 16',QF:'Quarter-final',SF:'Semi-final','3RD':'Third place',F:'The Final'};
+  function prettyPh(n){
+    return String(n).replace('Round of 32','R32').replace('Round of 16','R16')
+      .replace('Quarterfinal','QF').replace('Semifinal','SF')
+      .replace(/\s+(\d+)\s+Winner/,' #$1 W').replace(/\s+(\d+)\s+Loser/,' #$1 L');
+  }
+  function koLineHTML(g){
+    const H=g.hk?E[g.hk]:null, A=g.ak?E[g.ak]:null;
+    const left=H?H[0]+' '+g.hk:prettyPh(g.hName), right=A?g.ak+' '+A[0]:prettyPh(g.aName);
+    const mid=g.state==='in'?'<span class="live">LIVE '+g.hs+'–'+g.as+'</span>':'<span class="vs">'+aest(g.date)+'</span>';
+    const who=(H&&A)?'<span class="who">'+H[0]+' '+H[1]+' v '+A[1]+' '+A[0]+'</span>':'';
+    return '<div class="match"><span>'+left+'</span>'+mid+'<span>'+right+'</span>'+
+      '<span class="meta">'+aest(g.date)+' AEST · '+(ROUND_NAME[g.round]||'Knockout')+'</span>'+who+'</div>';
+  }
+
+  function bracketSide(name,key,sc,won,state){
+    const inner = key
+      ? '<span class="bk-name">'+E[key][0]+' '+key+'</span><span class="emp">'+E[key][0]+' '+E[key][1]+'</span>'
+      : '<span class="bk-name bk-ph">'+prettyPh(name)+'</span>';
+    const score = state==='pre' ? '' : '<span class="bk-sc">'+sc+'</span>';
+    return '<div class="bk-side'+(won?' bk-win':'')+'">'+inner+score+'</div>';
+  }
+  function bracketCard(g){
+    const hw=g.state==='post'&&g.hs>g.as, aw=g.state==='post'&&g.as>g.hs;
+    return '<div class="bk-match">'+
+      bracketSide(g.hName,g.hk,g.hs,hw,g.state)+
+      bracketSide(g.aName,g.ak,g.as,aw,g.state)+
+      '<div class="bk-meta">'+aest(g.date)+(g.state==='in'?' · LIVE '+g.hs+'–'+g.as:'')+(g.pso?' · '+g.pso:'')+'</div></div>';
+  }
+  function renderBracket(){
+    const el=document.getElementById('bracket'); if(!el) return;
+    if(!bracketGames.length){ el.innerHTML='<p class="empty">The knockout bracket appears here once qualifiers are confirmed. Hit “Refresh scores”.</p>'; return; }
+    const ROUNDS=[['R32','Round of 32'],['R16','Round of 16'],['QF','Quarter-finals'],['SF','Semi-finals'],['3RD','Third place'],['F','Final']];
+    el.innerHTML=ROUNDS.map(([rk,rt])=>{
+      const games=bracketGames.filter(g=>g.round===rk).sort((a,b)=>a.date<b.date?-1:(a.date>b.date?1:a.idx-b.idx));
+      const body=games.length?games.map(bracketCard).join(''):'<div class="bk-tbd">Awaiting qualifiers</div>';
+      return '<div class="bk-col'+(rk==='F'?' bk-col-final':'')+'"><div class="bk-col-h">'+rt+'</div>'+body+'</div>';
+    }).join('');
   }
 
   function paintEmoji(){ if(window.twemoji){ try{ twemoji.parse(document.body,{base:'https://cdn.jsdelivr.net/gh/twitter/twemoji@14.0.2/assets/',folder:'svg',ext:'.svg'}); }catch(e){} } }
-  function renderAll(){renderDash();renderStandings();renderSchedule();renderResults();paintEmoji();}
+  function renderAll(){renderDash();renderStandings();renderSchedule();renderResults();renderBracket();paintEmoji();}
 
   // ---------- Sweep draw tab ----------
   const groupsDraw={};
